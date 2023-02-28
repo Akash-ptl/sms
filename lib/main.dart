@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile_number/mobile_number.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sms/global.dart';
 import 'package:telephony/telephony.dart';
 
 main() async {
@@ -44,7 +46,8 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
   permissionServiceCall() async {
     await permissionServices().then(
       (value) {
-        if (value[Permission.sms]!.isGranted) {
+        if (value[Permission.sms]!.isGranted &&
+            value[Permission.phone]!.isGranted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const MyHomePage()),
@@ -55,9 +58,8 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
   }
 
   Future<Map<Permission, PermissionStatus>> permissionServices() async {
-    Map<Permission, PermissionStatus> statuses = await [
-      Permission.sms,
-    ].request();
+    Map<Permission, PermissionStatus> statuses =
+        await [Permission.sms, Permission.phone].request();
 
     if (statuses[Permission.sms]!.isPermanentlyDenied) {
       openAppSettings();
@@ -66,7 +68,13 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
         permissionServiceCall();
       }
     }
-
+    if (statuses[Permission.phone]!.isPermanentlyDenied) {
+      openAppSettings();
+    } else {
+      if (statuses[Permission.phone]!.isDenied) {
+        permissionServiceCall();
+      }
+    }
     return statuses;
   }
 
@@ -99,6 +107,27 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   bool start = false;
+  List<SimCard> _simCard = <SimCard>[];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _getSimCards();
+  }
+
+  Future<void> _getSimCards() async {
+    final hasPermission = await MobileNumber.hasPhonePermission;
+    if (hasPermission) {
+      final simCards = await MobileNumber.getSimCards;
+      setState(() {
+        _simCard = simCards!;
+        _simCard.length = sim;
+        print(_simCard.length);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -113,13 +142,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 'https://raw.githubusercontent.com/kgetechnologies/kgesitecdn/kgetechnologies-com/images/KgeMain.png')),
         backgroundColor: Colors.white,
         resizeToAvoidBottomInset: false,
-        body: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: const [],
-          ),
-        ),
+        body: Column(),
         floatingActionButton: FloatingActionButton(
           onPressed: () async {
             setState(() {
@@ -144,9 +167,8 @@ class _MyHomePageState extends State<MyHomePage> {
 Future<void> sendSms() async {
   final Telephony telephony = Telephony.instance;
 
-  String phoneNumber = '9328895180';
+  String phoneNumber = '6354449038';
   String message = 'KGE Technologies';
-
   telephony.sendSms(
     to: phoneNumber,
     message: 'KGE Technologies',
@@ -154,6 +176,7 @@ Future<void> sendSms() async {
   Map<String, dynamic> smsData = {
     'phoneNumber': phoneNumber,
     'message': message,
+    'sim': sim
   };
   String jsonEncoded = json.encode(smsData);
   print(jsonEncoded);
