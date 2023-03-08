@@ -36,7 +36,7 @@ class PermissionHandlerScreen extends StatefulWidget {
 }
 
 class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
-  late StreamSubscription subscription;
+  List<SimCard> _simCard = <SimCard>[];
   @override
   void initState() {
     super.initState();
@@ -45,15 +45,33 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
 
   permissionServiceCall() async {
     await permissionServices().then(
-      (value) {
+      (value) async {
         if (value[Permission.phone]!.isGranted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const MyHomePage()),
-          );
+          await _getSimCards();
         }
       },
     );
+  }
+
+  Future<void> _getSimCards() async {
+    // final hasPermission = await MobileNumber.hasPhonePermission;
+    // if (hasPermission) {
+    //   final simCards = await MobileNumber.getSimCards;
+    //   setState(() {
+    //     _simCard = simCards!;
+    //     _simCard.length = sim;
+    //     print(_simCard.length);
+    //   });
+    // }
+
+    if (Platform.isAndroid) {
+      final SimData simData = await SimDataPlugin.getSimData();
+      _simCard = simData.cards;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => MyHomePage(simCard: _simCard,)),
+      );
+    }
   }
 
   Future<Map<Permission, PermissionStatus>> permissionServices() async {
@@ -98,7 +116,10 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+  const MyHomePage({super.key,required this.simCard});
+
+
+  final List<SimCard> simCard;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -106,31 +127,11 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   bool start = false;
-  List<SimCard> _simCard = <SimCard>[];
   int? _choiceIndex;
 
   @override
   void initState() {
     super.initState();
-
-    _getSimCards();
-  }
-
-  Future<void> _getSimCards() async {
-    // final hasPermission = await MobileNumber.hasPhonePermission;
-    // if (hasPermission) {
-    //   final simCards = await MobileNumber.getSimCards;
-    //   setState(() {
-    //     _simCard = simCards!;
-    //     _simCard.length = sim;
-    //     print(_simCard.length);
-    //   });
-    // }
-
-    if (Platform.isAndroid) {
-      final SimData simData = await SimDataPlugin.getSimData();
-      _simCard = simData.cards;
-    }
   }
 
   @override
@@ -172,10 +173,10 @@ class _MyHomePageState extends State<MyHomePage> {
     return Container(
       height: MediaQuery.of(context).size.height/4,
       child: ListView.builder(
-        itemCount: _simCard.length,
+        itemCount: widget.simCard.length,
         itemBuilder: (BuildContext context, int index) {
           return ChoiceChip(
-            label: Text(_simCard[index].carrierName),
+            label: Text(widget.simCard[index].carrierName),
             selected: _choiceIndex == index,
             selectedColor: Colors.red,
             onSelected: (bool selected) {
@@ -211,7 +212,7 @@ class _MyHomePageState extends State<MyHomePage> {
       await Constants.nativeChannel.invokeMethod("sendSMS", {
         "mobileNumber": phoneNumber,
         "message": message,
-        "subscriptionId": _simCard[_choiceIndex ?? 0].subscriptionId.toString(),
+        "subscriptionId": widget.simCard[_choiceIndex ?? 0].subscriptionId.toString(),
       });
     }
   }
